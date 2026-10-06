@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recharge Tracking — Admin</title>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.7.0/mapbox-gl.css" rel="stylesheet">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+
+<div id="loginScreen">
+  <div class="logo">Recharge <span>Tracking</span> — Admin</div>
+  <input id="pinInput" type="password" inputmode="numeric" maxlength="6" placeholder="••••">
+  <button id="btnLogin">Masuk</button>
+  <div id="loginError"></div>
+</div>
+
+<div id="appContent" class="hidden">
+<header>
+  <div>
+    <div class="brand">Recharge <span>Tracking</span> — Admin</div>
+    <div class="sub" id="dateDisplay">—</div>
+  </div>
+</header>
+
+<main>
+  <div class="card">
+    <h2>Peta Live Tracking</h2>
+    <div id="mapContainer"></div>
+    <div id="driverStatusList" style="margin-top:12px;"></div>
+  </div>
+
+  <div class="card">
+    <h2>Buat &amp; Edit Rute</h2>
+    <div id="routeTripInfo" class="placeholder" style="padding:10px 0 14px;">Memeriksa trip aktif…</div>
+    <div id="routeBuilder" class="hidden">
+      <div id="titikList" style="display:flex; flex-direction:column; gap:10px;"></div>
+      <button id="btnAddTitik" class="btn-secondary" style="margin-top:10px;">+ Tambah Titik</button>
+
+      <div style="display:flex; align-items:center; gap:8px; margin-top:16px;">
+        <input type="checkbox" id="chkLewatTol" checked style="width:16px; height:16px;">
+        <label for="chkLewatTol" style="font-size:13.5px;">Boleh lewat tol</label>
+      </div>
+
+      <div style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap;">
+        <button id="btnHitungEstimasi" class="btn-secondary">Hitung Estimasi</button>
+        <button id="btnSimpanRute" class="btn-primary">Simpan &amp; Kirim ke Driver</button>
+      </div>
+
+      <div id="estimasiResult" class="status-value" style="margin-top:10px;"></div>
+      <div id="routeError" class="error-text" style="margin-top:6px;"></div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Status Koneksi</h2>
+      <div class="status-row">
+        <div class="dot" id="dotFirestore"></div>
+        <div class="status-label">Firestore</div>
+        <div class="status-value" id="valFirestore">Menghubungkan…</div>
+      </div>
+      <div class="status-row">
+        <div class="dot" id="dotAuth"></div>
+        <div class="status-label">Autentikasi</div>
+        <div class="status-value" id="valAuth">Menghubungkan…</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Ringkasan</h2>
+      <div class="placeholder">
+        Peta posisi driver, form rute, dan riwayat akan muncul di sini pada tahap-tahap berikutnya.
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Manajemen Driver</h2>
+    <div id="driverList"></div>
+    <div id="addDriverForm" style="margin-top:14px;">
+      <button id="btnShowAdd" class="btn-secondary">+ Tambah Driver</button>
+      <div id="addDriverFields" style="display:none; margin-top:12px; display:flex; flex-direction:column; gap:10px;">
+        <input id="inpNama" type="text" placeholder="Nama driver" class="field">
+        <input id="inpPin" type="password" inputmode="numeric" maxlength="6" placeholder="PIN (4-6 digit)" class="field">
+        <input id="inpPinConfirm" type="password" inputmode="numeric" maxlength="6" placeholder="Ulangi PIN" class="field">
+        <div id="addDriverError" class="error-text"></div>
+        <button id="btnSaveDriver" class="btn-primary">Simpan Driver</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Riwayat &amp; Arsip Trip</h2>
+    <div style="display:flex; gap:10px; align-items:center; margin-bottom:12px; flex-wrap:wrap;">
+      <input type="date" id="riwayatTanggal" class="field" style="flex:1; min-width:150px;">
+      <button id="btnMuatRiwayat" class="btn-secondary">Tampilkan</button>
+    </div>
+    <div id="riwayatListEl"></div>
+  </div>
+</main>
+
+<!-- Modal detail riwayat trip -->
+<div id="riwayatModal" class="hidden">
+  <div id="riwayatSheet">
+    <div class="sheet-title" id="riwayatModalTitle">—</div>
+    <div id="riwayatDetailBody"></div>
+    <div style="display:flex; gap:10px; margin-top:14px;">
+      <button id="btnCloseRiwayat" class="btn-secondary" style="flex:1;">Tutup</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal pilih lokasi manual di peta (fallback kalau nama tempat tidak ketemu di pencarian) -->
+<div id="pickLocationModal" class="hidden">
+  <div id="pickLocationSheet">
+    <div class="sheet-title">Pilih Lokasi di Peta</div>
+    <div class="placeholder" style="padding:0 0 10px; text-align:left;">Tap/klik titik di peta buat tentukan posisi persis. Nama lokasi tetap pakai teks yang sudah diketik di kolom pencarian.</div>
+    <div id="pickLocationMap"></div>
+    <div style="display:flex; gap:10px; margin-top:14px;">
+      <button id="btnCancelPick" class="btn-secondary" style="flex:1;">Batal</button>
+      <button id="btnConfirmPick" class="btn-primary" style="flex:2;" disabled>Gunakan Lokasi Ini</button>
+    </div>
+  </div>
+</div>
+
+<footer>Recharge Tracking · Tahap 9 — Keamanan</footer>
+</div><!-- /appContent -->
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.7.0/mapbox-gl.js"></script>
+
+<script src="js/config.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/admin.js"></script>
+
+</body>
+</html>

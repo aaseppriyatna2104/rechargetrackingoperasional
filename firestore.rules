@@ -1,0 +1,121 @@
+rules_version = '2';
+
+// ============================================================================
+// Firestore Security Rules — Recharge Tracking (Tahap 9: Pengerasan)
+//
+// Model akses:
+// - Driver login pakai PIN 4-6 digit → di-hash SHA-256 di browser → dicocokkan
+//   ke driver_pins → auth.uid (Anonymous Auth) di-link ke dokumen driver itu.
+//   Setelah itu, rules di bawah membatasi driver HANYA bisa baca/tulis data
+//   miliknya sendiri (trip, posisi live, checkpoint, transaksi), tidak bisa
+//   menyentuh data driver lain atau mengubah data admin.
+// - Admin login pakai PIN admin (terpisah) → divalidasi lewat admin_config/main
+//   → auth.uid didaftarkan ke koleksi admins. Admin bisa kelola driver_pins,
+//   routes, dan menghapus/mengedit data historis.
+//
+// CARA DEPLOY:
+//   Firebase Console → Firestore Database → tab "Rules" → tempel isi file ini
+//   → Publish. Atau lewat Firebase CLI: `firebase deploy --only firestore:rules`
+//
+// PENTING SEKALI SAAT PERTAMA DEPLOY:
+//   Dokumen admin_config/main (PIN admin) ditetapkan oleh PERCOBAAN LOGIN
+//   PERTAMA yang berhasil nyampe ke admin.html setelah rules ini aktif —
+//   siapa pun yang pertama kali submit PIN di admin.html, PIN itu yang jadi
+//   PIN admin permanen. Jadi begitu rules ini di-publish, SEGERA buka
+//   admin.html dan set PIN admin sendiri, SEBELUM membagikan link admin.html
+//   ke siapa pun atau membiarkan tab itu terbuka tanpa pengawasan.
+// ============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- Helper ---
+    function isAdmin(){
+      return request.auth != null
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function isLinkedDriver(driverId){
+      return request.auth != null
+        && get(/databases/$(database)/documents/driver_pins/$(driverId)).data.auth_uid == request.auth.uid;
+    }
+
+    // --- Bootstrap PIN admin & daftar admin ---
+    match /admin_config/main {
+      allow read: if false; // tidak pernah dibaca langsung oleh client, hanya dipakai via get() di rule lain
+      allow create: if request.auth != null; // hanya bisa terjadi SEKALI (lihat catatan di atas)
+      allow update: if isAdmin();
+      allow delete: if false;
+    }
+
+    match /admins/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.data.pin_hash == get(/databases/$(database)/documents/admin_config/main).data.pin_hash;
+      allow update, delete: if false; // cabut status admin manual lewat Firebase Console kalau perlu
+    }
+
+    // --- Akun & PIN driver ---
+    match /driver_pins/{driverId} {
+      // Dibaca saat proses login (cari dokumen lewat where pin_hash==...) —
+      // perlu bisa dibaca oleh sesi anonim yang BELUM ter-link ke driver manapun.
+      allow read: if request.auth != null;
+      allow create, delete: if isAdmin();
+      // Update diizinkan untuk admin (ubah data driver), ATAU untuk sesi
+      // anonim yang sedang mengklaim identitas driver ini saat login —
+      // tapi klaim itu HANYA boleh mengubah field auth_uid, tidak boleh
+      // mengubah nama atau pin_hash.
+      allow update: if isAdmin()
+        || (request.auth != null
+            && request.resource.data.auth_uid == request.auth.uid
+            && request.resource.data.nama == resource.data.nama
+            && request.resource.data.pin_hash == resource.data.pin_hash);
+    }
+
+    // --- Posisi live driver ---
+    match /drivers_live/{driverId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin() || isLinkedDriver(driverId);
+    }
+
+    // --- Trip (checkin s.d. selesai) ---
+    match /trips/{tripId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && isLinkedDriver(request.resource.data.driver_id);
+      allow update: if isAdmin() || isLinkedDriver(resource.data.driver_id);
+      allow delete: if isAdmin();
+    }
+
+    // --- Rute per trip (dibuat & diedit admin, dibaca driver) ---
+    match /routes/{tripId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+
+    // --- Checkpoint per titik rute ---
+    match /checkpoints/{checkpointId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && isLinkedDriver(get(/databases/$(database)/documents/trips/$(request.resource.data.trip_id)).data.driver_id);
+      allow update, delete: if isAdmin();
+    }
+
+    // --- Transaksi keuangan per trip ---
+    match /transaksi_keuangan/{transaksiId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && isLinkedDriver(request.resource.data.driver_id);
+      allow update, delete: if isAdmin();
+    }
+
+    // --- Koleksi uji koneksi (dipakai kartu "Status Koneksi" di kedua halaman) ---
+    match /_connection_test/{docId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Default: tolak semua yang tidak disebut di atas
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

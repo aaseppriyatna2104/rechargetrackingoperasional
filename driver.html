@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Recharge Tracking — Driver</title>
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/driver.css">
+</head>
+<body>
+
+<div id="loginScreen">
+  <div class="logo">Recharge <span>Tracking</span></div>
+  <input id="pinInput" type="password" inputmode="numeric" maxlength="6" placeholder="••••">
+  <button id="btnLogin">Masuk</button>
+  <div id="loginError"></div>
+</div>
+
+<div id="appContent" class="hidden">
+<header>
+  <div class="brand">Recharge <span>Tracking</span></div>
+  <div class="sub"><span id="driverNameDisplay">—</span> · <span id="dateDisplay">—</span> · <span class="logout-link" id="btnLogout">Keluar</span></div>
+</header>
+
+<main>
+  <div class="card">
+    <h2>Status Koneksi</h2>
+    <div class="status-row">
+      <div class="dot" id="dotFirestore"></div>
+      <div class="status-label">Firestore</div>
+      <div class="status-value" id="valFirestore">Menghubungkan…</div>
+    </div>
+    <div class="status-row">
+      <div class="dot" id="dotAuth"></div>
+      <div class="status-label">Autentikasi</div>
+      <div class="status-value" id="valAuth">Menghubungkan…</div>
+    </div>
+  </div>
+
+  <!-- Gate izin lokasi: tampil kalau izin belum granted -->
+  <div class="card hidden" id="locationGateCard">
+    <h2>Akses Lokasi Dibutuhkan</h2>
+    <div class="placeholder" style="padding:10px 0 16px;">
+      App ini butuh akses lokasi HP buat melacak posisi selama bertugas. Tanpa ini, checkin tidak bisa dimulai.
+    </div>
+    <button id="btnRequestLocation" class="btn-primary" style="width:100%;">Izinkan Akses Lokasi</button>
+    <div id="locationGateError" class="error-text" style="margin-top:8px;"></div>
+  </div>
+
+  <!-- Tombol checkin: tampil kalau izin sudah ada & belum ada trip aktif -->
+  <div class="card hidden" id="checkinCard">
+    <h2>Mulai Tugas Hari Ini</h2>
+    <div class="placeholder" style="padding:10px 0 16px;">
+      Checkin akan dicatat dari lokasi HP kamu saat ini sebagai titik awal (base) hari ini.
+    </div>
+    <button id="btnCheckin" class="btn-primary" style="width:100%;">Checkin Sekarang</button>
+    <div id="checkinError" class="error-text" style="margin-top:8px;"></div>
+  </div>
+
+  <!-- Status sedang bertugas: tampil kalau ada trip aktif -->
+  <div class="card hidden" id="trackingCard">
+    <h2>Status Tugas</h2>
+    <div class="status-row">
+      <div class="dot ok" id="dotTracking"></div>
+      <div class="status-label">Sedang bertugas sejak <span id="waktuCheckinDisplay">—</span></div>
+    </div>
+    <div class="status-row">
+      <div class="status-label" style="font-size:12.5px; color:var(--text-dim);">Posisi terakhir dikirim</div>
+      <div class="status-value" id="lastPushDisplay">—</div>
+    </div>
+  </div>
+
+  <!-- Rute & checkpoint -->
+  <div class="card hidden" id="routeCard">
+    <h2>Rute Hari Ini</h2>
+    <div id="routeListEl"></div>
+  </div>
+
+  <!-- Transaksi keuangan -->
+  <div class="card hidden" id="financeCard">
+    <h2>Transaksi Keuangan</h2>
+    <div id="financeListEl"></div>
+    <button id="btnAddFinance" class="btn-secondary" style="width:100%; margin-top:10px;">+ Tambah Transaksi</button>
+  </div>
+
+  <!-- Tutup tugas -->
+  <div class="card hidden" id="finishCard">
+    <h2>Tutup Tugas Hari Ini</h2>
+    <div class="placeholder" style="padding:8px 0 14px;">
+      Titik yang belum dikunjungi akan otomatis ditandai "ditunda". Pastikan sudah kembali ke titik checkin sebelum menutup tugas.
+    </div>
+    <button id="btnSelesai" class="btn-primary" style="width:100%; background:var(--warn); color:#2A1900;">Selesai — Tutup Tugas</button>
+  </div>
+
+  <!-- Status setelah selesai -->
+  <div class="card hidden" id="doneCard">
+    <div class="placeholder" style="padding:20px 0;">
+      Tugas hari ini sudah ditutup jam <span id="doneTimeDisplay">—</span>. Sampai jumpa besok!
+    </div>
+  </div>
+</main>
+
+<footer>Recharge Tracking · Tahap 7 — Keuangan &amp; Selesai</footer>
+</div><!-- /appContent -->
+
+<!-- Modal isi checkpoint -->
+<div id="checkpointModal" class="hidden">
+  <div id="checkpointSheet">
+    <div class="sheet-title" id="cpTitikNama">—</div>
+
+    <label class="field-label">Foto</label>
+    <input type="file" accept="image/*" capture="environment" id="cpFoto" class="field">
+    <img id="cpFotoPreview" class="hidden" alt="Preview foto">
+
+    <label class="field-label">Status Kunjungan</label>
+    <select id="cpStatus" class="field">
+      <option value="berhasil">Berhasil</option>
+      <option value="gagal">Gagal</option>
+      <option value="ditunda">Ditunda</option>
+    </select>
+
+    <label class="field-label">Jenis Aksi</label>
+    <select id="cpJenisAksi" class="field">
+      <option value="pemasangan">Pemasangan</option>
+      <option value="pengambilan">Pengambilan</option>
+      <option value="penukaran">Penukaran</option>
+      <option value="relokasi">Relokasi</option>
+    </select>
+
+    <label class="field-label">Machine ID</label>
+    <input type="text" id="cpMachineId" placeholder="Contoh: RC-00231" class="field">
+
+    <label class="field-label">Catatan</label>
+    <textarea id="cpCatatan" placeholder="Catatan tambahan (opsional)" class="field" rows="3"></textarea>
+
+    <div id="cpError" class="error-text"></div>
+
+    <div style="display:flex; gap:10px; margin-top:14px;">
+      <button id="btnCancelCheckpoint" class="btn-secondary" style="flex:1;">Batal</button>
+      <button id="btnSubmitCheckpoint" class="btn-primary" style="flex:2;">Simpan Checkpoint</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal transaksi keuangan -->
+<div id="financeModal" class="hidden">
+  <div id="financeSheet">
+    <div class="sheet-title">Tambah Transaksi</div>
+
+    <label class="field-label">Kategori</label>
+    <select id="fKategori" class="field">
+      <option value="BBM">BBM</option>
+      <option value="Flazz">Flazz</option>
+      <option value="Parkir">Parkir</option>
+      <option value="Tak Terduga">Tak Terduga</option>
+    </select>
+
+    <label class="field-label">Nominal (Rp)</label>
+    <input type="number" inputmode="numeric" id="fNominal" placeholder="Contoh: 50000" class="field">
+
+    <label class="field-label">Foto Struk (opsional)</label>
+    <input type="file" accept="image/*" capture="environment" id="fFoto" class="field">
+    <img id="fFotoPreview" class="hidden" alt="Preview struk">
+
+    <label class="field-label">Catatan</label>
+    <textarea id="fCatatan" placeholder="Catatan (wajib kalau Tak Terduga)" class="field" rows="3"></textarea>
+
+    <div id="fError" class="error-text"></div>
+
+    <div style="display:flex; gap:10px; margin-top:14px;">
+      <button id="btnCancelFinance" class="btn-secondary" style="flex:1;">Batal</button>
+      <button id="btnSubmitFinance" class="btn-primary" style="flex:2;">Simpan Transaksi</button>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase SDK (compat, biar simpel tanpa bundler) -->
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+
+<script src="js/config.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/driver.js"></script>
+
+</body>
+</html>
