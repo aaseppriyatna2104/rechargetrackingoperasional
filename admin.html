@@ -25,17 +25,32 @@
   </div>
 </header>
 
-<main>
+<div class="tabs">
+  <button class="tab active" data-tab="operasional">Operasional</button>
+  <button class="tab" data-tab="rekap">Rekap</button>
+  <button id="btnNotif" class="tab-notif" title="Notifikasi (aktif selama halaman ini terbuka)">🔔</button>
+</div>
+
+<main id="tabOperasional">
   <div class="card">
     <h2>Peta Live Tracking</h2>
     <div id="mapContainer"></div>
     <div id="driverStatusList" style="margin-top:12px;"></div>
+    <div id="liveRouteList"></div>
   </div>
 
   <div class="card">
     <h2>Buat &amp; Edit Rute</h2>
-    <div id="routeTripInfo" class="placeholder" style="padding:10px 0 14px;">Memeriksa trip aktif…</div>
+    <div id="routeTripInfo" class="placeholder" style="padding:10px 0 14px;">Pilih driver dan tanggal dulu.</div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
+      <select id="rencanaDriver" class="field" style="flex:1; min-width:140px;"></select>
+      <input type="date" id="rencanaTanggal" class="field" style="flex:1; min-width:140px;">
+    </div>
     <div id="routeBuilder" class="hidden">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+        <div style="flex:1; font-size:13px;"><span style="color:var(--text-dim);">Titik awal:</span> <span id="titikAwalInfo">belum dipilih</span></div>
+        <button id="btnPilihTitikAwal" class="btn-secondary" title="Pilih titik awal di peta">📍 Pilih</button>
+      </div>
       <div id="titikList" style="display:flex; flex-direction:column; gap:10px;"></div>
       <button id="btnAddTitik" class="btn-secondary" style="margin-top:10px;">+ Tambah Titik</button>
 
@@ -70,10 +85,8 @@
     </div>
 
     <div class="card">
-      <h2>Ringkasan</h2>
-      <div class="placeholder">
-        Peta posisi driver, form rute, dan riwayat akan muncul di sini pada tahap-tahap berikutnya.
-      </div>
+      <h2>Ringkasan Hari Ini</h2>
+      <div id="ringkasanBody"><div class="empty-note">Memuat…</div></div>
     </div>
   </div>
 
@@ -99,6 +112,47 @@
       <button id="btnMuatRiwayat" class="btn-secondary">Tampilkan</button>
     </div>
     <div id="riwayatListEl"></div>
+  </div>
+</main>
+
+<main id="tabRekap" class="hidden">
+  <div class="card">
+    <h2>Rekap Operasional</h2>
+    <div class="rk-row">
+      <input type="date" id="rkDari" class="field">
+      <input type="date" id="rkSampai" class="field">
+      <select id="rkDriver" class="field"></select>
+    </div>
+    <div class="rk-row">
+      <button class="btn-secondary" data-range="today">Hari ini</button>
+      <button class="btn-secondary" data-range="7">7 hari</button>
+      <button class="btn-secondary" data-range="month">Bulan ini</button>
+      <select id="rkGroup" class="field">
+        <option value="hari">Per hari</option>
+        <option value="minggu">Per minggu</option>
+        <option value="driver">Per driver</option>
+      </select>
+      <button id="rkTampil" class="btn-primary">Tampilkan</button>
+    </div>
+    <div id="rkError" class="error-text"></div>
+    <div id="rkSummary"></div>
+    <div class="tbl-wrap"><table id="rkTable" class="rk-table"></table></div>
+    <div class="rk-row" style="margin-top:12px;">
+      <button id="rkExpRekap" class="btn-secondary">⬇ CSV Rekap</button>
+      <button id="rkExpCp" class="btn-secondary">⬇ CSV Checkpoint</button>
+      <button id="rkExpTrx" class="btn-secondary">⬇ CSV Keuangan</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Riwayat per Mesin</h2>
+    <div class="rk-row">
+      <input type="text" id="rkMesin" class="field" placeholder="Machine ID, contoh: RC-00231">
+      <button id="rkCariMesin" class="btn-secondary">Cari</button>
+      <button id="rkExpMesin" class="btn-secondary">⬇ CSV</button>
+    </div>
+    <div id="rkMesinInfo" class="status-value" style="margin:8px 0;"></div>
+    <div class="tbl-wrap"><table id="rkMesinTable" class="rk-table"></table></div>
   </div>
 </main>
 
@@ -136,6 +190,10 @@
 
 <script src="js/config.js"></script>
 <script src="js/utils.js"></script>
+<script src="js/livemap.js"></script>
+<script src="js/ringkasan.js"></script>
+<script src="js/replay.js"></script>
+<script src="js/rekap.js"></script>
 <script src="js/admin.js"></script>
 
 </body>
