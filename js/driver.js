@@ -189,6 +189,19 @@ document.addEventListener('visibilitychange', async ()=>{
   }
 });
 
+let lastJejak = null;
+async function pushJejak(pos){
+  const p = { lat: +pos.coords.latitude.toFixed(5), lng: +pos.coords.longitude.toFixed(5), t: Math.round(Date.now() / 1000) };
+  if(lastJejak && jarakMeter(lastJejak.lat, lastJejak.lng, p.lat, p.lng) < JEJAK_MIN_GERAK_M && p.t - lastJejak.t < JEJAK_MAX_DIAM_S) return;
+  lastJejak = p;
+  try{
+    await db.collection('jejak').doc(currentTripId).set({
+      trip_id: currentTripId, driver_id: currentDriverId,
+      titik: firebase.firestore.FieldValue.arrayUnion(p)
+    }, { merge: true });
+  }catch(e){ console.warn('Jejak gagal disimpan (non-fatal):', e.message); }
+}
+
 async function pushPosition(){
   try{
     const pos = await getPosition();
@@ -200,6 +213,7 @@ async function pushPosition(){
       trip_id: currentTripId
     }, { merge: true });
     lastPushDisplay.textContent = new Date().toLocaleTimeString('id-ID');
+    pushJejak(pos);
   }catch(err){
     console.error('Gagal push posisi:', err);
     lastPushDisplay.textContent = 'Gagal kirim (' + err.message + ')';
@@ -347,6 +361,8 @@ const btnSubmitCheckpoint = document.getElementById('btnSubmitCheckpoint');
 let currentRouteTitik = [];      // dari routes/{tripId}, urut sesuai urutan_titik
 let existingCheckpoints = {};    // urutan_titik -> data checkpoint terakhir
 let routeUnsub = null;
+let planUnsub = null;
+let routeDocData = null, planDocData = null;
 let checkpointsUnsub = null;
 let activeTitikForModal = null;  // titik yang lagi dibuka di modal
 let cpFotoFile = null;           // file foto terpilih (sebelum kompresi+upload)
@@ -444,18 +460,53 @@ async function submitCheckpoint(){
   if(!activeTitikForModal){ return; }
   if(!cpFotoFile){ cpError.textContent = 'Foto wajib diisi.'; return; }
   if(!cpMachineId.value.trim()){ cpError.textContent = 'Machine ID wajib diisi.'; return; }
-  if(cpStatus.value === 'ditunda' && !cpCatatan.value.trim()){
-    cpError.textContent = 'Catatan wajib diisi kalau status "Ditunda".';
+  if((cpStatus.value === 'ditunda' || cpStatus.value === 'gagal') && !cpCatatan.value.trim()){
+    cpError.textContent = 'Catatan wajib diisi kalau status "Ditunda" atau "Gagal".';
     return;
   }
 
   btnSubmitCheckpoint.disabled = true;
   btnSubmitCheckpoint.textContent = 'Menyimpan…';
   try{
+    // --- Validasi GPS: "berhasil" hanya boleh disimpan kalau driver ada di dekat titik ---
+    const t = activeTitikForModal;
+    const butuhGps = cpStatus.value === 'berhasil' && typeof t.lat === 'number' && typeof t.lng === 'number';
+    let gps = { validasi_gps: 'tidak_dicek' };
+    btnSubmitCheckpoint.textContent = 'Mengecek lokasi…';
+    try{
+      const pos = await getPosition(butuhGps
+        ? { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+        : { enableHighAccuracy: true, timeout: 5000, maximumAge: 30000 });
+      const akurasi = Math.round(pos.coords.accuracy || 0);
+      const jarak = (typeof t.lat === 'number' && typeof t.lng === 'number')
+        ? Math.round(jarakMeter(pos.coords.latitude, pos.coords.longitude, t.lat, t.lng)) : null;
+      if(butuhGps){
+        const efektif = jarak - Math.min(akurasi, CHECKPOINT_MAX_AKURASI_TOLERANSI_M);
+        if(efektif > CHECKPOINT_RADIUS_M){
+          cpError.textContent = `Kamu berjarak sekitar ${jarak} m dari titik (maks ${CHECKPOINT_RADIUS_M} m, akurasi GPS ±${akurasi} m). Dekati lokasi dulu, atau ubah status ke Gagal/Ditunda dengan catatan.`;
+          return;
+        }
+      }
+      gps = {
+        validasi_gps: butuhGps ? 'lolos' : 'tidak_dicek',
+        posisi_driver: { lat: pos.coords.latitude, lng: pos.coords.longitude },
+        akurasi_m: akurasi,
+        jarak_ke_titik_m: jarak
+      };
+    }catch(gpsErr){
+      if(butuhGps){
+        cpError.textContent = 'GPS tidak bisa dibaca, jadi lokasi belum bisa divalidasi. Aktifkan lokasi HP lalu coba lagi, atau ubah status ke Gagal/Ditunda dengan catatan.';
+        return;
+      }
+      gps = { validasi_gps: 'gps_tidak_tersedia' };
+    }
+
+    btnSubmitCheckpoint.textContent = 'Menyimpan…';
     const compressed = await compressImage(cpFotoFile, 1280, 0.72);
     const fotoUrl = await uploadToCloudinary(compressed);
 
     await db.collection('checkpoints').add({
+      ...gps,
       trip_id: currentTripId,
       urutan_titik: activeTitikForModal.urutan_titik,
       nama_lokasi: activeTitikForModal.nama_lokasi,
@@ -479,23 +530,36 @@ async function submitCheckpoint(){
 }
 btnSubmitCheckpoint.addEventListener('click', submitCheckpoint);
 
+function applyRoute(){
+  const src = (routeDocData && Array.isArray(routeDocData.titik) && routeDocData.titik.length) ? routeDocData : planDocData;
+  currentRouteTitik = src && Array.isArray(src.titik)
+    ? src.titik.slice().sort((a,b)=>a.urutan_titik - b.urutan_titik) : [];
+  renderRouteList();
+}
+
 function startRouteListeners(tripId){
   if(routeUnsub) routeUnsub();
+  if(planUnsub) planUnsub();
   if(checkpointsUnsub) checkpointsUnsub();
+  routeDocData = null; planDocData = null;
 
   routeCard.classList.remove('hidden');
 
   routeUnsub = db.collection('routes').doc(tripId).onSnapshot(doc=>{
-    if(doc.exists && Array.isArray(doc.data().titik)){
-      currentRouteTitik = doc.data().titik.slice().sort((a,b)=>a.urutan_titik - b.urutan_titik);
-    }else{
-      currentRouteTitik = [];
-    }
-    renderRouteList();
+    routeDocData = doc.exists ? doc.data() : null;
+    applyRoute();
   }, err=>{
     console.error('Listener rute error:', err);
     routeListEl.innerHTML = '<div class="error-text">Gagal memuat rute: ' + err.message + '</div>';
   });
+
+  // Rencana rute yang dibuat admin sebelum checkin (dipakai kalau routes/{tripId} belum ada)
+  const d = new Date(), p = n => String(n).padStart(2,'0');
+  const tgl = `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
+  planUnsub = db.collection('rencana_rute').doc(`${currentDriverId}_${tgl}`).onSnapshot(doc=>{
+    planDocData = doc.exists ? doc.data() : null;
+    applyRoute();
+  }, err=> console.error('Listener rencana rute error:', err));
 
   checkpointsUnsub = db.collection('checkpoints').where('trip_id','==',tripId).onSnapshot(snapshot=>{
     existingCheckpoints = {};
@@ -666,6 +730,7 @@ async function handleSelesai(){
     if(trackingTimer) clearInterval(trackingTimer);
     if(wakeLockSentinel){ wakeLockSentinel.release().catch(()=>{}); wakeLockSentinel = null; }
     if(routeUnsub) routeUnsub();
+    if(planUnsub) planUnsub();
     if(checkpointsUnsub) checkpointsUnsub();
     if(financeUnsub) financeUnsub();
     await db.collection('drivers_live').doc(currentDriverId).set({ status: 'selesai' }, { merge: true });

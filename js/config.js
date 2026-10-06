@@ -39,3 +39,16 @@ const auth = firebase.auth();
 db.enablePersistence({ synchronizeTabs: true }).catch(err=>{
   console.warn('Firestore offline persistence tidak aktif:', err.code);
 });
+
+// === Validasi GPS checkpoint ===
+// Status "berhasil" hanya bisa disimpan kalau posisi driver berada dalam radius ini dari titik rute.
+const CHECKPOINT_RADIUS_M = 100;
+// Akurasi GPS yang diberi toleransi (meter). Dalam gedung akurasi sering buruk, jadi jarak
+// dikurangi akurasi (maks nilai ini) sebelum dibandingkan dengan radius.
+const CHECKPOINT_MAX_AKURASI_TOLERANSI_M = 150;
+
+// === Jejak aktual (replay jalur) ===
+// Titik posisi disimpan ke Firestore hanya kalau driver bergerak >= JEJAK_MIN_GERAK_M dari titik
+// tersimpan terakhir, atau sudah lewat JEJAK_MAX_DIAM_S detik (heartbeat saat diam). Hemat kuota tulis.
+const JEJAK_MIN_GERAK_M = 15;
+const JEJAK_MAX_DIAM_S = 300;

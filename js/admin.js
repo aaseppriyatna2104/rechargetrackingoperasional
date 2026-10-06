@@ -171,10 +171,8 @@ function initAdminApp(){
 
   const driverNames = {}; // cache driver_id -> nama, dipakai juga buat popup peta
 
-  async function loadDrivers(){
-    driverListEl.innerHTML = '<div class="empty-note">Memuat…</div>';
+  function renderDrivers(snap){
     try{
-      const snap = await db.collection('driver_pins').get();
       if(snap.empty){
         driverListEl.innerHTML = '<div class="empty-note">Belum ada driver terdaftar.</div>';
         return;
@@ -195,6 +193,7 @@ function initAdminApp(){
         driverListEl.appendChild(row);
       });
 
+      populateRencanaDriver();
       driverListEl.querySelectorAll('.btn-delete').forEach(btn=>{
         btn.addEventListener('click', ()=> confirmDeleteDriver(btn.dataset.id, btn.dataset.nama));
       });
@@ -202,6 +201,21 @@ function initAdminApp(){
       driverListEl.innerHTML = '<div class="empty-note">Gagal memuat: ' + err.message + '</div>';
       console.error(err);
     }
+  }
+
+  // Realtime: daftar driver & status "Terhubung" ikut berubah otomatis (dipanggil sekali; panggilan lain = no-op).
+  let driversListening = false;
+  function loadDrivers(){
+    if(driversListening) return;
+    driversListening = true;
+    driverListEl.innerHTML = '<div class="empty-note">Memuat…</div>';
+    db.collection('driver_pins').onSnapshot(snap=>{
+      renderDrivers(snap);
+      if(typeof renderRiwayatList === 'function') renderRiwayatList(lastRiwayatTrips); // nama driver di riwayat ikut segar
+    }, err=>{
+      driverListEl.innerHTML = '<div class="empty-note">Gagal memuat: ' + err.message + '</div>';
+      console.error(err);
+    });
   }
 
   async function confirmDeleteDriver(driverId, nama){
@@ -328,8 +342,14 @@ function initAdminApp(){
   const estimasiResult = document.getElementById('estimasiResult');
   const routeError = document.getElementById('routeError');
 
-  let activeTripId = null;
-  let activeTripBase = null; // {lat, lng} dari lokasi_checkin
+  const rencanaDriver = document.getElementById('rencanaDriver');
+  const rencanaTanggal = document.getElementById('rencanaTanggal');
+  const titikAwalInfo = document.getElementById('titikAwalInfo');
+  const btnPilihTitikAwal = document.getElementById('btnPilihTitikAwal');
+  let activeTripsByDriver = {}; // driver_id -> {id, base}
+  let selectedDriverId = null;
+  let routeTarget = null;       // {type:'trip'|'plan', id}
+  let titikAwal = null;         // {nama_lokasi, lat, lng}
   let routeTitik = []; // [{nama_lokasi, lat, lng}]
 
   function renderTitikList(){
@@ -457,7 +477,8 @@ function initAdminApp(){
       routeError.textContent = 'Pilih minimal 1 lokasi dari hasil pencarian dulu.';
       return;
     }
-    const coords = [activeTripBase, ...validTitik]
+    if(!titikAwal || !titikAwal.lat){ routeError.textContent = 'Pilih titik awal dulu (tombol 📍 Pilih).'; return; }
+    const coords = [titikAwal, ...validTitik]
       .map(t => `${t.lng},${t.lat}`)
       .join(';');
     const profile = 'mapbox/driving';
@@ -486,7 +507,8 @@ function initAdminApp(){
 
   async function saveRoute(){
     routeError.textContent = '';
-    if(!activeTripId){ routeError.textContent = 'Tidak ada trip aktif.'; return; }
+    if(!routeTarget){ routeError.textContent = 'Pilih driver dulu.'; return; }
+    if(!titikAwal || !titikAwal.lat){ routeError.textContent = 'Titik awal belum dipilih.'; return; }
     const incomplete = routeTitik.some(t => !t.lat || !t.lng);
     if(routeTitik.length === 0 || incomplete){
       routeError.textContent = 'Semua titik harus dipilih dari hasil pencarian (belum teks bebas).';
@@ -494,19 +516,33 @@ function initAdminApp(){
     }
     btnSimpanRute.disabled = true;
     try{
-      await db.collection('routes').doc(activeTripId).set({
-        trip_id: activeTripId,
-        titik: routeTitik.map((t, i)=>({
-          urutan_titik: i+1,
-          nama_lokasi: t.nama_lokasi,
-          lat: t.lat,
-          lng: t.lng
-        })),
+      // Simpan geometri rute (polyline) supaya peta live tidak perlu memanggil Directions berulang.
+      // Gagal/lebih dari 25 titik -> disimpan tanpa geometri, peta memakai garis lurus putus-putus.
+      let geo = {};
+      try{
+        const cs = [titikAwal, ...routeTitik].map(t => `${t.lng},${t.lat}`).join(';');
+        const ex = chkLewatTol.checked ? '' : '&exclude=toll';
+        const res = await fetch(`https://api.mapbox.com/directions/v5/mapbox/driving/${cs}?access_token=${MAPBOX_TOKEN}&overview=full&geometries=polyline${ex}`);
+        const j = await res.json();
+        if(j.routes && j.routes[0]) geo = { geometri: j.routes[0].geometry, jarak_m: Math.round(j.routes[0].distance), durasi_s: Math.round(j.routes[0].duration) };
+      }catch(e){ console.warn('Geometri rute tidak tersimpan:', e); }
+      const payload = {
+        ...geo,
+        driver_id: selectedDriverId,
+        titik_awal: titikAwal,
+        titik: routeTitik.map((t, i)=>({ urutan_titik: i+1, nama_lokasi: t.nama_lokasi, lat: t.lat, lng: t.lng })),
         boleh_tol: chkLewatTol.checked,
         dibuat_oleh_admin: true,
         terakhir_diedit: firebase.firestore.FieldValue.serverTimestamp()
-      });
-      routeError.textContent = '';
+      };
+      if(routeTarget.type === 'trip'){
+        payload.trip_id = routeTarget.id;
+        await db.collection('routes').doc(routeTarget.id).set(payload);
+      }else{
+        payload.tanggal = rencanaTanggal.value;
+        await db.collection('rencana_rute').doc(routeTarget.id).set(payload);
+      }
+      try{ localStorage.setItem('titik_awal_terakhir', JSON.stringify(titikAwal)); }catch(e){}
       estimasiResult.textContent = (estimasiResult.textContent || '') + ' · Tersimpan ✓';
     }catch(err){
       routeError.textContent = 'Gagal menyimpan: ' + err.message;
@@ -531,7 +567,7 @@ function initAdminApp(){
     pickTargetIdx = idx;
     pickLocationModal.classList.remove('hidden');
 
-    const existing = routeTitik[idx];
+    const existing = idx === -1 ? (titikAwal || {}) : routeTitik[idx];
     pickedCoord = (existing.lat && existing.lng) ? { lat: existing.lat, lng: existing.lng } : null;
     btnConfirmPick.disabled = !pickedCoord;
 
@@ -580,6 +616,12 @@ function initAdminApp(){
 
   btnConfirmPick.addEventListener('click', ()=>{
     if(pickTargetIdx === null || !pickedCoord) return;
+    if(pickTargetIdx === -1){
+      titikAwal = { nama_lokasi: `Titik awal (${pickedCoord.lat.toFixed(5)}, ${pickedCoord.lng.toFixed(5)})`, lat: pickedCoord.lat, lng: pickedCoord.lng };
+      closePickLocationModal();
+      renderTitikAwal();
+      return;
+    }
     routeTitik[pickTargetIdx].lat = pickedCoord.lat;
     routeTitik[pickTargetIdx].lng = pickedCoord.lng;
     // Kalau admin belum ketik nama apa-apa, beri label default biar jelas ini pin manual.
@@ -590,45 +632,79 @@ function initAdminApp(){
     renderTitikList();
   });
 
-  async function loadActiveTripAndRoute(){
-    try{
-      const snap = await db.collection('trips').where('status','==','berjalan').limit(1).get();
-      if(snap.empty){
-        activeTripId = null;
-        routeTripInfo.textContent = 'Belum ada driver yang checkin hari ini. Rute baru bisa dibuat setelah driver checkin.';
-        routeTripInfo.classList.remove('hidden');
-        routeBuilder.classList.add('hidden');
-        return;
-      }
-      const tripDoc = snap.docs[0];
-      const tripData = tripDoc.data();
-      activeTripId = tripDoc.id;
-      activeTripBase = tripData.lokasi_checkin;
-      const nama = driverNames[tripData.driver_id] || tripData.driver_id;
-      routeTripInfo.textContent = `Rute untuk ${nama} (checkin hari ini)`;
-      routeBuilder.classList.remove('hidden');
+  // === Multi-trip & rencana rute (tanpa harus menunggu checkin) ===
+  // routes/{tripId}            -> rute untuk trip yang sedang berjalan (dibaca driver)
+  // rencana_rute/{driver}_{tgl} -> rencana dibuat duluan; driver membacanya otomatis saat checkin
+  function todayStr(){
+    const d = new Date(), p = n => String(n).padStart(2,'0');
+    return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
+  }
+  rencanaTanggal.value = todayStr();
 
-      const routeDoc = await db.collection('routes').doc(activeTripId).get();
-      if(routeDoc.exists && Array.isArray(routeDoc.data().titik)){
-        routeTitik = routeDoc.data().titik
-          .sort((a,b)=>a.urutan_titik - b.urutan_titik)
-          .map(t=>({ nama_lokasi:t.nama_lokasi, lat:t.lat, lng:t.lng }));
-        chkLewatTol.checked = routeDoc.data().boleh_tol !== false;
-      }else{
-        routeTitik = [];
-      }
-      renderTitikList();
-    }catch(err){
-      routeTripInfo.textContent = 'Gagal memuat trip aktif: ' + err.message;
-      console.error(err);
-    }
+  function populateRencanaDriver(){
+    const prev = rencanaDriver.value;
+    rencanaDriver.innerHTML = '<option value="">— Pilih driver —</option>' +
+      Object.keys(driverNames).map(id=>`<option value="${id}">${driverNames[id]}${activeTripsByDriver[id] ? ' • bertugas' : ''}</option>`).join('');
+    rencanaDriver.value = driverNames[prev] ? prev : '';
   }
 
-  loadActiveTripAndRoute();
-  // Cek ulang tiap 20 detik HANYA kalau belum ada trip aktif — biar gak nimpa edit rute yang lagi dikerjain admin
-  setInterval(()=>{
-    if(!activeTripId) loadActiveTripAndRoute();
-  }, 20000);
+  function renderTitikAwal(){
+    titikAwalInfo.textContent = titikAwal && titikAwal.lat ? titikAwal.nama_lokasi : 'belum dipilih';
+  }
+  btnPilihTitikAwal.addEventListener('click', ()=> openPickLocationModal(-1));
+
+  async function loadRouteTarget(){
+    routeError.textContent = ''; estimasiResult.textContent = '';
+    selectedDriverId = rencanaDriver.value || null;
+    if(!selectedDriverId || !rencanaTanggal.value){
+      routeTarget = null; routeBuilder.classList.add('hidden');
+      routeTripInfo.textContent = 'Pilih driver dan tanggal dulu.';
+      return;
+    }
+    const tgl = rencanaTanggal.value;
+    const trip = tgl === todayStr() ? activeTripsByDriver[selectedDriverId] : null;
+    routeTarget = trip ? { type:'trip', id: trip.id } : { type:'plan', id: `${selectedDriverId}_${tgl}` };
+    const nama = driverNames[selectedDriverId] || selectedDriverId;
+    routeTripInfo.textContent = trip
+      ? `${nama} sedang bertugas — perubahan rute langsung terkirim ke driver.`
+      : `Rencana rute ${nama} untuk ${tgl} — otomatis dipakai saat driver checkin.`;
+    routeBuilder.classList.remove('hidden');
+
+    let data = null;
+    try{
+      const main = await (trip ? db.collection('routes').doc(trip.id) : db.collection('rencana_rute').doc(routeTarget.id)).get();
+      if(main.exists) data = main.data();
+      else if(trip){ // trip jalan tapi belum ada routes: pakai rencana yang sudah dibuat
+        const pd = await db.collection('rencana_rute').doc(`${selectedDriverId}_${tgl}`).get();
+        if(pd.exists) data = pd.data();
+      }
+    }catch(err){ routeError.textContent = 'Gagal memuat rute: ' + err.message; }
+
+    routeTitik = data && Array.isArray(data.titik)
+      ? data.titik.slice().sort((a,b)=>a.urutan_titik-b.urutan_titik).map(t=>({ nama_lokasi:t.nama_lokasi, lat:t.lat, lng:t.lng }))
+      : [];
+    chkLewatTol.checked = data ? data.boleh_tol !== false : true;
+    if(data && data.titik_awal) titikAwal = data.titik_awal;
+    else if(trip && trip.base) titikAwal = { nama_lokasi:'Lokasi checkin', lat:trip.base.lat, lng:trip.base.lng };
+    else { try{ titikAwal = JSON.parse(localStorage.getItem('titik_awal_terakhir')); }catch(e){ titikAwal = null; } }
+    renderTitikAwal();
+    renderTitikList();
+  }
+  rencanaDriver.addEventListener('change', loadRouteTarget);
+  rencanaTanggal.addEventListener('change', loadRouteTarget);
+
+  // Semua trip berjalan, realtime. Muat ulang editor hanya kalau targetnya berubah
+  // (misal rencana -> trip saat driver checkin), supaya edit admin yang sedang jalan tidak tertimpa.
+  db.collection('trips').where('status','==','berjalan').onSnapshot(snap=>{
+    activeTripsByDriver = {};
+    snap.forEach(d=>{ const x = d.data(); activeTripsByDriver[x.driver_id] = { id:d.id, base:x.lokasi_checkin }; });
+    populateRencanaDriver();
+    if(!selectedDriverId) return;
+    const trip = rencanaTanggal.value === todayStr() ? activeTripsByDriver[selectedDriverId] : null;
+    const wantKey = trip ? 'trip:'+trip.id : 'plan:'+selectedDriverId+'_'+rencanaTanggal.value;
+    const haveKey = routeTarget ? routeTarget.type+':'+routeTarget.id : null;
+    if(wantKey !== haveKey) loadRouteTarget();
+  }, err=> console.error('Listener trips aktif error:', err));
 
   // === Riwayat & Arsip Trip (Tahap 8) ===
   const riwayatTanggal = document.getElementById('riwayatTanggal');
@@ -672,50 +748,40 @@ function initAdminApp(){
     });
   }
 
-  async function loadRiwayat(){
-    riwayatListEl.innerHTML = '<div class="empty-note">Memuat…</div>';
-    try{
-      const tanggalStr = riwayatTanggal.value;
-      if(!tanggalStr){
-        riwayatListEl.innerHTML = '<div class="empty-note">Pilih tanggal dulu.</div>';
-        return;
-      }
-      const [y, m, d] = tanggalStr.split('-').map(Number);
-      const startOfDay = new Date(y, m-1, d, 0, 0, 0, 0);
-      const endOfDay = new Date(y, m-1, d+1, 0, 0, 0, 0);
-
-      const snap = await db.collection('trips')
-        .where('waktu_checkin', '>=', startOfDay)
-        .where('waktu_checkin', '<', endOfDay)
-        .orderBy('waktu_checkin', 'desc')
-        .get();
-      const trips = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      renderRiwayatList(trips);
-    }catch(err){
-      riwayatListEl.innerHTML = '<div class="empty-note">Gagal memuat: ' + err.message + '</div>';
-      console.error(err);
+  let riwayatUnsub = null;
+  let lastRiwayatTrips = [];
+  function loadRiwayat(){
+    if(riwayatUnsub){ riwayatUnsub(); riwayatUnsub = null; }
+    const tanggalStr = riwayatTanggal.value;
+    if(!tanggalStr){
+      riwayatListEl.innerHTML = '<div class="empty-note">Pilih tanggal dulu.</div>';
+      return;
     }
+    riwayatListEl.innerHTML = '<div class="empty-note">Memuat…</div>';
+    const [y, m, d] = tanggalStr.split('-').map(Number);
+    const startOfDay = new Date(y, m-1, d, 0, 0, 0, 0);
+    const endOfDay = new Date(y, m-1, d+1, 0, 0, 0, 0);
+    // Realtime: trip baru / trip selesai langsung muncul tanpa refresh
+    riwayatUnsub = db.collection('trips')
+      .where('waktu_checkin', '>=', startOfDay)
+      .where('waktu_checkin', '<', endOfDay)
+      .orderBy('waktu_checkin', 'desc')
+      .onSnapshot(snap=>{
+        lastRiwayatTrips = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        renderRiwayatList(lastRiwayatTrips);
+      }, err=>{
+        riwayatListEl.innerHTML = '<div class="empty-note">Gagal memuat: ' + err.message + '</div>';
+        console.error(err);
+      });
   }
   btnMuatRiwayat.addEventListener('click', loadRiwayat);
   riwayatTanggal.addEventListener('change', loadRiwayat);
 
-  async function openRiwayatDetail(tripId, nama, waktuMulai, waktuSelesai){
-    riwayatModalTitle.textContent = nama;
-    riwayatDetailBody.innerHTML = '<div class="empty-note">Memuat detail…</div>';
-    riwayatModal.classList.remove('hidden');
-    try{
-      const [cpSnap, finSnap] = await Promise.all([
-        db.collection('checkpoints').where('trip_id','==',tripId).get(),
-        db.collection('transaksi_keuangan').where('trip_id','==',tripId).get()
-      ]);
-      const checkpoints = cpSnap.docs.map(d=>d.data()).sort((a,b)=>a.urutan_titik - b.urutan_titik);
-      const transaksi = finSnap.docs.map(d=>d.data());
+  let detailUnsubs = [];
+  function stopDetail(){ detailUnsubs.forEach(u=>u()); detailUnsubs = []; }
 
-      let html = `<div class="status-value" style="margin-bottom:10px;">
-        Checkin: ${waktuMulai ? waktuMulai.toLocaleString('id-ID') : '—'}<br>
-        Selesai: ${waktuSelesai ? waktuSelesai.toLocaleString('id-ID') : 'Masih berjalan'}
-      </div>`;
-
+  function buildDetailHtml(checkpoints, transaksi){
+    let html = '';
       html += '<div class="sheet-title" style="font-size:13px; margin-top:14px;">Checkpoint</div>';
       if(checkpoints.length === 0){
         html += '<div class="empty-note">Tidak ada checkpoint tercatat.</div>';
@@ -727,7 +793,7 @@ function initAdminApp(){
               <div class="titik-badge done">${cp.urutan_titik}</div>
               <div class="titik-info">
                 <div class="titik-nama">${cp.nama_lokasi}</div>
-                <div class="titik-status ${cp.status_kunjungan}">${cp.status_kunjungan}${cp.jenis_aksi ? ' · ' + cp.jenis_aksi : ''}${cp.machine_id ? ' · ' + cp.machine_id : ''} · ${waktu}</div>
+                <div class="titik-status ${cp.status_kunjungan}">${cp.status_kunjungan}${cp.jenis_aksi ? ' · ' + cp.jenis_aksi : ''}${cp.machine_id ? ' · ' + cp.machine_id : ''} · ${waktu}${cp.jarak_ke_titik_m != null ? ' · ' + cp.jarak_ke_titik_m + ' m dari titik' : ''}</div>
                 ${cp.catatan ? `<div class="status-value" style="margin-top:2px;">${cp.catatan}</div>` : ''}
               </div>
               ${cp.foto_url ? `<a href="${cp.foto_url}" target="_blank" rel="noopener"><img src="${cp.foto_url}" class="riwayat-thumb" alt="Foto checkpoint"></a>` : ''}
@@ -755,17 +821,51 @@ function initAdminApp(){
         html += `<div class="status-value" style="margin-top:8px; text-align:right;">Total: Rp ${total.toLocaleString('id-ID')}</div>`;
       }
 
-      riwayatDetailBody.innerHTML = html;
-    }catch(err){
-      riwayatDetailBody.innerHTML = '<div class="empty-note">Gagal memuat detail: ' + err.message + '</div>';
-      console.error(err);
-    }
+      return html;
+  }
+
+  // Realtime selama modal terbuka: checkpoint, transaksi, dan status trip ikut update otomatis.
+  // (Replay jalur diambil sekali saat modal dibuka; tutup & buka lagi untuk memuat jejak terbaru.)
+  function openRiwayatDetail(tripId, nama, waktuMulai, waktuSelesai){
+    stopDetail();
+    riwayatModalTitle.textContent = nama;
+    riwayatModal.classList.remove('hidden');
+    riwayatDetailBody.innerHTML = `<div class="status-value" id="detailWaktu" style="margin-bottom:10px;"></div>
+      <div class="sheet-title" style="font-size:13px; margin-top:14px;">Jalur Trip</div><div id="replayBox"></div>
+      <div id="detailLive"><div class="empty-note">Memuat detail…</div></div>`;
+    const setWaktu = (mulai, selesai) => {
+      const el = document.getElementById('detailWaktu');
+      if(el) el.innerHTML = `Checkin: ${mulai ? mulai.toLocaleString('id-ID') : '—'}<br>Selesai: ${selesai ? selesai.toLocaleString('id-ID') : 'Masih berjalan'}`;
+    };
+    setWaktu(waktuMulai, waktuSelesai);
+
+    let cps = [], trx = [], gotC = false, gotT = false, replayDone = false;
+    const paint = () => {
+      if(!gotC || !gotT) return;
+      document.getElementById('detailLive').innerHTML = buildDetailHtml(cps, trx);
+      if(!replayDone){ replayDone = true; renderReplay(document.getElementById('replayBox'), tripId, cps); }
+    };
+    const fail = err => { document.getElementById('detailLive').innerHTML = '<div class="empty-note">Gagal memuat detail: ' + err.message + '</div>'; console.error(err); };
+    detailUnsubs.push(db.collection('trips').doc(tripId).onSnapshot(d=>{
+      if(d.exists){ const t = d.data(); setWaktu(t.waktu_checkin ? t.waktu_checkin.toDate() : null, t.waktu_selesai ? t.waktu_selesai.toDate() : null); }
+    }, fail));
+    detailUnsubs.push(db.collection('checkpoints').where('trip_id','==',tripId).onSnapshot(s=>{
+      cps = s.docs.map(d=>d.data()).sort((a,b)=>a.urutan_titik - b.urutan_titik); gotC = true; paint();
+    }, fail));
+    detailUnsubs.push(db.collection('transaksi_keuangan').where('trip_id','==',tripId).onSnapshot(s=>{
+      trx = s.docs.map(d=>d.data()); gotT = true; paint();
+    }, fail));
   }
 
   function closeRiwayatDetail(){
+    stopDetail();
+    closeReplay();
     riwayatModal.classList.add('hidden');
   }
   btnCloseRiwayat.addEventListener('click', closeRiwayatDetail);
 
   loadRiwayat();
+  initRekapApp({ driverNames, map });
+  initLiveRoutes({ map, driverNames });
+  initRingkasan({ driverNames });
 }
