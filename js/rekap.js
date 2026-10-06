@@ -126,6 +126,24 @@ function initRekapApp({ driverNames, map }){
         rows.push([d ? ymd(d) : '', nm(t.driver_id), c.urutan_titik, c.nama_lokasi, c.status_kunjungan, c.jenis_aksi, c.machine_id, c.catatan, c.jarak_ke_titik_m, c.validasi_gps, fmtDT(c.timestamp_selesai), c.foto_url]); });
     csv(rows, `checkpoint_${rkDari.value}_${rkSampai.value}.csv`);
   });
+  $('rkHapus').addEventListener('click', async () => {
+    rkError.textContent = '';
+    await muat(true); // pastikan data = filter yang sedang tampil di layar
+    if(!DATA.loaded) return;
+    const target = DATA.trips.filter(t => t.status !== 'berjalan');
+    const skip = DATA.trips.length - target.length;
+    if(!target.length){ rkError.textContent = 'Tidak ada trip selesai di rentang/driver ini untuk dihapus.'; return; }
+    const ket = `${target.length} trip (${rkDari.value} s.d. ${rkSampai.value}, ${rkDriver.value ? nm(rkDriver.value) : 'semua driver'}) beserta seluruh checkpoint, transaksi keuangan, dan jejak GPS-nya`
+      + (skip ? `.\n${skip} trip yang masih berjalan TIDAK ikut dihapus` : '');
+    if(!konfirmasiHapus('Hapus ' + ket + '?')) return;
+    const btn = $('rkHapus'), label = btn.textContent;
+    btn.disabled = true;
+    try{
+      await hapusTripPermanen(target.map(t => t.id), (n, total) => { btn.textContent = `Menghapus ${n}/${total}…`; });
+      await muat();
+    }catch(err){ rkError.textContent = 'Gagal menghapus: ' + err.message; console.error(err); }
+    finally{ btn.disabled = false; btn.textContent = label; }
+  });
   $('rkExpTrx').addEventListener('click', () => {
     if(!DATA.loaded) { rkError.textContent = 'Tampilkan rekap dulu.'; return; }
     const tm = new Map(DATA.trips.map(t => [t.id, t]));

@@ -72,6 +72,12 @@ async function attemptAdminLogin(){
     btnLogin.disabled = false;
   }
 }
+document.getElementById('btnLogout').addEventListener('click', async ()=>{
+  if(!confirm('Keluar dari admin? Kamu harus memasukkan PIN admin lagi untuk masuk.')) return;
+  try{ await auth.signOut(); }catch(err){ console.error(err); }
+  location.reload(); // sesi anonim baru -> bukan admin lagi sampai PIN dimasukkan
+});
+
 btnLogin.addEventListener('click', attemptAdminLogin);
 pinInput.addEventListener('keydown', e=>{ if(e.key === 'Enter') attemptAdminLogin(); });
 
@@ -793,7 +799,7 @@ function initAdminApp(){
               <div class="titik-badge done">${cp.urutan_titik}</div>
               <div class="titik-info">
                 <div class="titik-nama">${cp.nama_lokasi}</div>
-                <div class="titik-status ${cp.status_kunjungan}">${cp.status_kunjungan}${cp.jenis_aksi ? ' · ' + cp.jenis_aksi : ''}${cp.machine_id ? ' · ' + cp.machine_id : ''} · ${waktu}${cp.jarak_ke_titik_m != null ? ' · ' + cp.jarak_ke_titik_m + ' m dari titik' : ''}</div>
+                <div class="titik-status ${cp.status_kunjungan}">${cp.status_kunjungan}${cp.jenis_aksi ? ' · ' + cp.jenis_aksi : ''}${cp.machine_id ? ' · ' + cp.machine_id : ''} · ${waktu}${cp.durasi_detik != null ? ' · di titik ' + fmtDurasi(cp.durasi_detik) : ''}${cp.jarak_ke_titik_m != null ? ' · ' + cp.jarak_ke_titik_m + ' m dari titik' : ''}</div>
                 ${cp.catatan ? `<div class="status-value" style="margin-top:2px;">${cp.catatan}</div>` : ''}
               </div>
               ${cp.foto_url ? `<a href="${cp.foto_url}" target="_blank" rel="noopener"><img src="${cp.foto_url}" class="riwayat-thumb" alt="Foto checkpoint"></a>` : ''}
@@ -832,7 +838,9 @@ function initAdminApp(){
     riwayatModal.classList.remove('hidden');
     riwayatDetailBody.innerHTML = `<div class="status-value" id="detailWaktu" style="margin-bottom:10px;"></div>
       <div class="sheet-title" style="font-size:13px; margin-top:14px;">Jalur Trip</div><div id="replayBox"></div>
-      <div id="detailLive"><div class="empty-note">Memuat detail…</div></div>`;
+      <div id="detailLive"><div class="empty-note">Memuat detail…</div></div>
+      <div id="detailBanding"></div>
+      <div id="detailHapusBox"></div>`;
     const setWaktu = (mulai, selesai) => {
       const el = document.getElementById('detailWaktu');
       if(el) el.innerHTML = `Checkin: ${mulai ? mulai.toLocaleString('id-ID') : '—'}<br>Selesai: ${selesai ? selesai.toLocaleString('id-ID') : 'Masih berjalan'}`;
@@ -840,14 +848,51 @@ function initAdminApp(){
     setWaktu(waktuMulai, waktuSelesai);
 
     let cps = [], trx = [], gotC = false, gotT = false, replayDone = false;
+    const setHapusBox = status => {
+      const box = document.getElementById('detailHapusBox');
+      if(!box) return;
+      if(status === 'berjalan'){
+        box.innerHTML = '<div class="status-value" style="margin-top:14px;">Trip masih berjalan — belum bisa dihapus.</div>';
+        return;
+      }
+      if(box.dataset.ready) return;
+      box.dataset.ready = '1';
+      const label = '🗑 Hapus Trip Ini Permanen';
+      box.innerHTML = `<button class="btn-delete" id="btnHapusTrip" style="margin-top:14px;">${label}</button>`;
+      const btn = document.getElementById('btnHapusTrip');
+      btn.addEventListener('click', async ()=>{
+        if(!konfirmasiHapus(`Hapus trip "${nama}" beserta ${cps.length} checkpoint, ${trx.length} transaksi keuangan, dan jejak GPS-nya?`)) return;
+        btn.disabled = true; btn.textContent = 'Menghapus…';
+        try{
+          await hapusTripPermanen([tripId]);
+          closeRiwayatDetail();
+        }catch(err){
+          btn.disabled = false; btn.textContent = label;
+          alert('Gagal menghapus: ' + err.message);
+          console.error(err);
+        }
+      });
+    };
+    let tripData = null, banding = null, bandingDone = false;
+    const tryBanding = async () => {
+      if(bandingDone || !tripData || !gotC || !gotT) return;
+      bandingDone = true;
+      const box = document.getElementById('detailBanding'); if(!box) return;
+      try{
+        banding = await ambilBanding(tripId, tripData, cps);
+        box.innerHTML = htmlBanding(banding, tripData) + '<button class="btn-secondary" id="btnPdfTrip" style="margin-top:10px;">⬇ Laporan PDF</button>';
+        document.getElementById('btnPdfTrip').addEventListener('click', () => buatPdfTrip({ trip: tripData, nama, cps, trx, banding }));
+      }catch(err){ box.innerHTML = '<div class="empty-note">Gagal memuat perbandingan: ' + err.message + '</div>'; console.error(err); }
+    };
     const paint = () => {
       if(!gotC || !gotT) return;
       document.getElementById('detailLive').innerHTML = buildDetailHtml(cps, trx);
       if(!replayDone){ replayDone = true; renderReplay(document.getElementById('replayBox'), tripId, cps); }
+      tryBanding();
     };
     const fail = err => { document.getElementById('detailLive').innerHTML = '<div class="empty-note">Gagal memuat detail: ' + err.message + '</div>'; console.error(err); };
     detailUnsubs.push(db.collection('trips').doc(tripId).onSnapshot(d=>{
-      if(d.exists){ const t = d.data(); setWaktu(t.waktu_checkin ? t.waktu_checkin.toDate() : null, t.waktu_selesai ? t.waktu_selesai.toDate() : null); }
+      if(d.exists){ const t = d.data(); setWaktu(t.waktu_checkin ? t.waktu_checkin.toDate() : null, t.waktu_selesai ? t.waktu_selesai.toDate() : null); setHapusBox(t.status); tripData = t; tryBanding(); }
     }, fail));
     detailUnsubs.push(db.collection('checkpoints').where('trip_id','==',tripId).onSnapshot(s=>{
       cps = s.docs.map(d=>d.data()).sort((a,b)=>a.urutan_titik - b.urutan_titik); gotC = true; paint();
@@ -865,6 +910,7 @@ function initAdminApp(){
   btnCloseRiwayat.addEventListener('click', closeRiwayatDetail);
 
   loadRiwayat();
+  initMaster();
   initRekapApp({ driverNames, map });
   initLiveRoutes({ map, driverNames });
   initRingkasan({ driverNames });

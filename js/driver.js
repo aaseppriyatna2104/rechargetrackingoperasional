@@ -112,10 +112,18 @@ async function attemptLogin(){
 btnLogin.addEventListener('click', attemptLogin);
 pinInput.addEventListener('keydown', e=>{ if(e.key === 'Enter') attemptLogin(); });
 
-btnLogout.addEventListener('click', ()=>{
+btnLogout.addEventListener('click', async ()=>{
+  if(currentTripId && !confirm('Trip kamu masih berjalan. Kalau keluar, pelacakan GPS berhenti sampai kamu login lagi. Tetap keluar?')) return;
+  // Pastikan checkpoint/transaksi yang dibuat saat offline sudah terkirim sebelum sesi ditutup
+  try{
+    await Promise.race([db.waitForPendingWrites(), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 4000))]);
+  }catch(e){
+    if(!confirm('Masih ada data yang belum terkirim (sinyal lemah?). Kalau keluar sekarang, data itu bisa hilang. Tetap keluar?')) return;
+  }
   localStorage.removeItem('driver_id');
   localStorage.removeItem('driver_nama');
-  showLogin();
+  try{ await auth.signOut(); }catch(err){ console.error(err); }
+  location.reload(); // bersihkan timer GPS & listener, dan mulai sesi anonim baru
 });
 
 // Begitu Anonymous Auth siap, cek apakah sudah pernah login (localStorage) sebelumnya
@@ -229,14 +237,41 @@ function startTracking(tripId, driverId){
   trackingTimer = setInterval(pushPosition, TRACKING_INTERVAL_MS);
 }
 
+const ckKendaraan = document.getElementById('ckKendaraan');
+const ckOdoAwal = document.getElementById('ckOdoAwal');
+const ckOdoAkhir = document.getElementById('ckOdoAkhir');
+const mesinList = document.getElementById('mesinList');
+let mesinSet = new Set(), cpOpenedAt = 0, masterListening = false;
+// Master data kendaraan & mesin (dikelola admin) — dibaca realtime setelah auth siap
+auth.onAuthStateChanged(user => {
+  if(!user || masterListening) return;
+  masterListening = true;
+  db.collection('kendaraan').orderBy('plat').onSnapshot(s => {
+    const pilih = ckKendaraan.value;
+    ckKendaraan.innerHTML = '<option value="">Pilih kendaraan…</option>';
+    s.docs.forEach(d => { const o = document.createElement('option'); o.value = d.id; o.dataset.plat = d.data().plat; o.textContent = d.data().plat + (d.data().jenis ? ' - ' + d.data().jenis : ''); ckKendaraan.appendChild(o); });
+    ckKendaraan.value = pilih;
+  }, e => console.error('Kendaraan:', e));
+  db.collection('mesin').onSnapshot(s => {
+    mesinSet = new Set(s.docs.map(d => d.id));
+    mesinList.innerHTML = '';
+    s.docs.forEach(d => { const o = document.createElement('option'); o.value = d.id; mesinList.appendChild(o); });
+  }, e => console.error('Mesin:', e));
+});
+
 async function startCheckin(){
   checkinError.textContent = '';
+  const adaKendaraan = ckKendaraan.options.length > 1;
+  if(adaKendaraan && (!ckKendaraan.value || ckOdoAwal.value === '')){ checkinError.textContent = 'Pilih kendaraan dan isi odometer awal dulu.'; return; }
   btnCheckin.disabled = true;
   try{
     const pos = await getPosition();
     const driverId = localStorage.getItem('driver_id');
     const tripRef = await db.collection('trips').add({
       driver_id: driverId,
+      kendaraan_id: ckKendaraan.value || null,
+      kendaraan_plat: ckKendaraan.value ? ckKendaraan.selectedOptions[0].dataset.plat : null,
+      odometer_awal: ckKendaraan.value ? Number(ckOdoAwal.value) : null,
       lokasi_checkin: { lat: pos.coords.latitude, lng: pos.coords.longitude },
       waktu_checkin: firebase.firestore.FieldValue.serverTimestamp(),
       waktu_selesai: null,
@@ -401,7 +436,7 @@ function openCheckpointModal(urutanTitik){
   cpFotoFile = null;
   cpStatus.value = 'berhasil';
   cpJenisAksi.value = 'pemasangan';
-  cpMachineId.value = '';
+  cpMachineId.value = ''; cpOpenedAt = Date.now();
   cpCatatan.value = '';
   cpError.textContent = '';
   checkpointModal.classList.remove('hidden');
@@ -458,8 +493,11 @@ async function uploadToCloudinary(blob){
 async function submitCheckpoint(){
   cpError.textContent = '';
   if(!activeTitikForModal){ return; }
+  const durasiDetik = cpOpenedAt ? Math.round((Date.now() - cpOpenedAt) / 1000) : null;
   if(!cpFotoFile){ cpError.textContent = 'Foto wajib diisi.'; return; }
   if(!cpMachineId.value.trim()){ cpError.textContent = 'Machine ID wajib diisi.'; return; }
+  const mid = cpMachineId.value.trim().toUpperCase();
+  if(mesinSet.size && !mesinSet.has(mid) && !confirm(`Machine ID "${mid}" tidak ada di master data. Pastikan tidak salah ketik. Tetap simpan?`)) return;
   if((cpStatus.value === 'ditunda' || cpStatus.value === 'gagal') && !cpCatatan.value.trim()){
     cpError.textContent = 'Catatan wajib diisi kalau status "Ditunda" atau "Gagal".';
     return;
@@ -514,7 +552,8 @@ async function submitCheckpoint(){
       timestamp_selesai: firebase.firestore.FieldValue.serverTimestamp(),
       status_kunjungan: cpStatus.value,
       jenis_aksi: cpJenisAksi.value,
-      machine_id: cpMachineId.value.trim(),
+      machine_id: mid,
+      durasi_detik: durasiDetik,
       foto_url: fotoUrl,
       catatan: cpCatatan.value.trim()
     });
@@ -693,6 +732,12 @@ function startFinanceListener(tripId){
 
 // === Tombol Selesai ===
 async function handleSelesai(){
+  let tripDoc = {};
+  try{ tripDoc = (await db.collection('trips').doc(currentTripId).get()).data() || {}; }catch(e){ console.error(e); }
+  const odoAkhir = Number(ckOdoAkhir.value);
+  if(tripDoc.odometer_awal != null && (ckOdoAkhir.value === '' || odoAkhir < tripDoc.odometer_awal)){
+    alert(`Isi odometer akhir dulu (harus sama atau lebih dari odometer awal: ${tripDoc.odometer_awal} km).`); ckOdoAkhir.focus(); return;
+  }
   const belumDikunjungi = currentRouteTitik.filter(t => !existingCheckpoints[t.urutan_titik]);
   const pesan = belumDikunjungi.length > 0
     ? `Masih ada ${belumDikunjungi.length} titik yang belum dikunjungi. Titik tersebut akan otomatis ditandai "ditunda". Yakin mau tutup tugas sekarang?`
@@ -723,6 +768,8 @@ async function handleSelesai(){
 
     await db.collection('trips').doc(currentTripId).update({
       status: 'selesai',
+      odometer_akhir: tripDoc.odometer_awal != null ? odoAkhir : null,
+      km_odometer: tripDoc.odometer_awal != null ? odoAkhir - tripDoc.odometer_awal : null,
       waktu_selesai: firebase.firestore.FieldValue.serverTimestamp()
     });
 
