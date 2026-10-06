@@ -23,6 +23,7 @@
     <div class="brand">Recharge <span>Tracking</span> — Admin</div>
     <div class="sub" id="dateDisplay">—</div>
   </div>
+  <span class="logout-link" id="btnLogout">Keluar</span>
 </header>
 
 <div class="tabs">
@@ -91,6 +92,23 @@
   </div>
 
   <div class="card">
+    <h2>Master Data: Kendaraan &amp; Mesin</h2>
+    <div class="sheet-title" style="font-size:13px;">Kendaraan</div>
+    <div id="kendList"></div>
+    <div class="rk-row" style="margin-top:8px;">
+      <input id="kendPlat" class="field" placeholder="Plat, contoh: B 1234 XYZ">
+      <input id="kendJenis" class="field" placeholder="Jenis (opsional)">
+      <button id="btnAddKend" class="btn-secondary">+ Tambah</button>
+    </div>
+    <div class="sheet-title" style="font-size:13px; margin-top:16px;">Mesin</div>
+    <div id="mesinCount" class="status-value"></div>
+    <div id="mesinList" style="max-height:200px; overflow:auto;"></div>
+    <textarea id="mesinInput" class="field" rows="3" placeholder="Machine ID, satu per baris (boleh banyak sekaligus)" style="margin-top:8px;"></textarea>
+    <button id="btnAddMesin" class="btn-secondary" style="margin-top:8px;">+ Tambah Mesin</button>
+    <div id="masterError" class="error-text" style="margin-top:6px;"></div>
+  </div>
+
+  <div class="card">
     <h2>Manajemen Driver</h2>
     <div id="driverList"></div>
     <div id="addDriverForm" style="margin-top:14px;">
@@ -141,6 +159,10 @@
       <button id="rkExpRekap" class="btn-secondary">⬇ CSV Rekap</button>
       <button id="rkExpCp" class="btn-secondary">⬇ CSV Checkpoint</button>
       <button id="rkExpTrx" class="btn-secondary">⬇ CSV Keuangan</button>
+    </div>
+    <div class="rk-row" style="margin-top:12px;">
+      <button id="rkHapus" class="btn-delete">🗑 Hapus Data Rentang Ini</button>
+      <span class="status-value">Menghapus trip yang tampil di filter di atas (selain yang masih berjalan). Permanen.</span>
     </div>
   </div>
 
@@ -193,6 +215,10 @@
 <script src="js/livemap.js"></script>
 <script src="js/ringkasan.js"></script>
 <script src="js/replay.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="js/hapus.js"></script>
+<script src="js/master.js"></script>
+<script src="js/laporan.js"></script>
 <script src="js/rekap.js"></script>
 <script src="js/admin.js"></script>
 

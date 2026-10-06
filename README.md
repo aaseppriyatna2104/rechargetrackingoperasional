@@ -21,6 +21,7 @@ Dua halaman terpisah:
 ├── js/
 │   ├── config.js         # Kredensial Firebase/Cloudinary/Mapbox + init
 │   ├── utils.js           # Fungsi bersama (hashPin)
+│   ├── hapus.js           # Hapus permanen trip + turunannya (khusus admin)
 │   ├── driver.js          # Logika driver.html
 │   └── admin.js           # Logika admin.html
 ├── firestore.rules      # Security Rules — WAJIB di-deploy ke Firebase Console
@@ -127,3 +128,22 @@ Sistem sudah lengkap untuk skala 1 driver/1 kendaraan sesuai kebutuhan awal. Pen
 ## Pembaruan: kartu Ringkasan Hari Ini (admin)
 
 Kartu "Ringkasan" yang sebelumnya hanya teks placeholder kini realtime (`js/ringkasan.js`): driver bertugas, trip hari ini (berjalan/selesai), progres titik rute aktif, hitungan berhasil/gagal/ditunda/tidak dikunjungi, keuangan hari ini per kategori, dan daftar peringatan (posisi basi, titik gagal/ditunda, biaya Tak Terduga). Dihitung per **trip**, bukan per jam: trip yang checkin hari ini **atau masih berjalan** (termasuk shift yang lewat tengah malam) beserta checkpoint & transaksinya tetap tampil sampai driver tekan Selesai; setelah itu trip dari hari sebelumnya keluar dari kartu (tetap ada di Rekap & Riwayat).
+
+## Pembaruan: tombol Keluar & hapus data permanen
+
+- **Keluar (admin & driver)**: tombol "Keluar" kini benar-benar `auth.signOut()` lalu reload, jadi sesi lama tidak bisa dipakai lagi dan harus login PIN ulang. Driver: ada peringatan kalau trip masih berjalan (GPS berhenti) atau masih ada data offline yang belum terkirim.
+- **Hapus permanen (khusus admin)**, `js/hapus.js`:
+  - Per trip: **Riwayat → detail trip → "Hapus Trip Ini Permanen"**.
+  - Per rentang: tab **Rekap → "Hapus Data Rentang Ini"** (mengikuti filter tanggal & driver yang tampil).
+  - Yang terhapus: `trips`, `checkpoints`, `transaksi_keuangan`, `jejak`, `routes` milik trip itu. Trip berstatus **berjalan tidak bisa dihapus**. Wajib ketik **HAPUS** untuk konfirmasi.
+  - Foto di Cloudinary **tidak ikut terhapus** (hanya URL-nya yang hilang).
+  - Tidak perlu deploy ulang `firestore.rules` — aturan `delete` khusus admin sudah ada.
+
+## Pembaruan: kendaraan, master mesin, dwell time, rencana vs aktual, PDF
+
+- **Kendaraan + odometer**: koleksi `kendaraan` (dikelola admin di kartu *Master Data*). Driver pilih kendaraan + isi odometer awal saat checkin, odometer akhir saat tutup tugas (tidak boleh lebih kecil dari awal). Tersimpan di `trips`: `kendaraan_id`, `kendaraan_plat`, `odometer_awal`, `odometer_akhir`, `km_odometer`. Kalau master kendaraan masih kosong, checkin tetap jalan tanpa kendaraan.
+- **Master mesin**: koleksi `mesin` (id = Machine ID huruf besar). Form checkpoint driver memberi saran otomatis (datalist) dan memperingatkan kalau ID tidak ada di master. Machine ID kini disimpan huruf besar.
+- **Dwell time**: `checkpoints.durasi_detik` = lama dari form checkpoint dibuka sampai disimpan (pendekatan; bukan deteksi geofence).
+- **Rencana vs aktual** (`js/laporan.js`): di detail trip — jarak rencana vs jarak GPS aktual (jumlah jarak antar titik jejak), waktu tempuh rencana vs durasi trip, jumlah titik berhasil/gagal/ditunda, kesesuaian urutan, rata-rata waktu di titik, dan km odometer.
+- **Laporan PDF**: tombol di detail trip (jsPDF dari cdnjs). Foto dicantumkan sebagai link, belum disematkan.
+- **Wajib deploy ulang `firestore.rules`** (ada koleksi `kendaraan` & `mesin`).

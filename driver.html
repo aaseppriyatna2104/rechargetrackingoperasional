@@ -53,6 +53,8 @@
     <div class="placeholder" style="padding:10px 0 16px;">
       Checkin akan dicatat dari lokasi HP kamu saat ini sebagai titik awal (base) hari ini.
     </div>
+    <select id="ckKendaraan" class="field" style="margin-bottom:10px;"><option value="">Pilih kendaraan…</option></select>
+    <input id="ckOdoAwal" type="number" inputmode="numeric" class="field" placeholder="Odometer awal (km)" style="margin-bottom:12px;">
     <button id="btnCheckin" class="btn-primary" style="width:100%;">Checkin Sekarang</button>
     <div id="checkinError" class="error-text" style="margin-top:8px;"></div>
   </div>
@@ -89,6 +91,7 @@
     <div class="placeholder" style="padding:8px 0 14px;">
       Titik yang belum dikunjungi akan otomatis ditandai "ditunda". Pastikan sudah kembali ke titik checkin sebelum menutup tugas.
     </div>
+    <input id="ckOdoAkhir" type="number" inputmode="numeric" class="field" placeholder="Odometer akhir (km)" style="margin-bottom:12px;">
     <button id="btnSelesai" class="btn-primary" style="width:100%; background:var(--warn); color:#2A1900;">Selesai — Tutup Tugas</button>
   </div>
 
@@ -128,7 +131,8 @@
     </select>
 
     <label class="field-label">Machine ID</label>
-    <input type="text" id="cpMachineId" placeholder="Contoh: RC-00231" class="field">
+    <datalist id="mesinList"></datalist>
+    <input type="text" id="cpMachineId" list="mesinList" autocomplete="off" placeholder="Contoh: RC-00231" class="field">
 
     <label class="field-label">Catatan</label>
     <textarea id="cpCatatan" placeholder="Catatan tambahan (opsional)" class="field" rows="3"></textarea>
