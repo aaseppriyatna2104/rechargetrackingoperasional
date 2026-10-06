@@ -1,0 +1,93 @@
+/* ==========================================================================
+   base.css — token warna & komponen yang dipakai di driver.html DAN admin.html
+   Dimuat SEBELUM driver.css / admin.css di tiap halaman.
+   ========================================================================== */
+
+:root{
+  --bg:#0A1118;
+  --surface:#121B26;
+  --surface-2:#16212E;
+  --border:#1F2A37;
+  --text:#E8EDF2;
+  --text-dim:#8B99A8;
+  --accent:#2DD4BF;
+  --accent-dim:#1B4D47;
+  --warn:#F5A524;
+  --danger:#F43F5E;
+  --radius:14px;
+}
+
+*{box-sizing:border-box; margin:0; padding:0;}
+html,body{height:100%;}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;
+  min-height:100%;
+}
+
+/* Utilitas sembunyikan elemen — dipakai luas di kedua halaman lewat classList.toggle/add/remove('hidden') */
+.hidden{display:none !important;}
+
+.status-row{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:10px 0;
+  border-bottom:1px solid var(--border);
+}
+.status-row:last-child{border-bottom:none;}
+.dot{
+  width:9px; height:9px; border-radius:50%;
+  background:var(--text-dim);
+  flex-shrink:0;
+}
+.dot.ok{background:var(--accent); box-shadow:0 0 0 4px var(--accent-dim);}
+.dot.err{background:var(--danger);}
+.status-label{flex:1; font-size:14px;}
+.status-value{font-size:12.5px; color:var(--text-dim);}
+
+.error-text{color:var(--danger); font-size:12.5px; min-height:16px;}
+.btn-primary:disabled{opacity:0.5; cursor:default;}
+
+/* --- Layar login PIN (dipakai driver.html DAN admin.html) --- */
+#loginScreen{
+  position:fixed; inset:0;
+  background:var(--bg);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding:24px;
+  gap:18px;
+  z-index:50;
+}
+#loginScreen .logo{font-size:17px; font-weight:600;}
+#loginScreen .logo span{color:var(--accent);}
+#pinInput{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:16px;
+  font-size:26px;
+  letter-spacing:10px;
+  text-align:center;
+  color:var(--text);
+  width:220px;
+  outline:none;
+}
+#pinInput:focus{border-color:var(--accent);}
+#btnLogin{
+  background:var(--accent);
+  color:#06211D;
+  border:none;
+  border-radius:10px;
+  padding:13px 28px;
+  font-size:14px;
+  font-weight:600;
+  cursor:pointer;
+  width:220px;
+}
+#btnLogin:disabled{opacity:0.5;}
+#loginError{color:var(--danger); font-size:12.5px; min-height:16px;}

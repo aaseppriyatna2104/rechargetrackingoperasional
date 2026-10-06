@@ -1,0 +1,264 @@
+/* ==========================================================================
+   admin.css — khusus admin.html. Memuat css/base.css dulu sebelum ini.
+   ========================================================================== */
+
+header{
+  padding:18px 28px;
+  border-bottom:1px solid var(--border);
+  background:var(--surface);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  flex-wrap:wrap;
+  gap:10px;
+}
+.brand{font-size:16px; font-weight:600;}
+.brand span{color:var(--accent);}
+.sub{font-size:12.5px; color:var(--text-dim); margin-top:3px;}
+main{
+  padding:24px 28px;
+  max-width:960px;
+  margin:0 auto;
+  display:flex;
+  flex-direction:column;
+  gap:16px;
+}
+.grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));
+  gap:16px;
+}
+.card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:18px;
+}
+.card h2{
+  font-size:13px;
+  font-weight:600;
+  color:var(--text-dim);
+  margin-bottom:12px;
+}
+.placeholder{
+  text-align:center;
+  padding:32px 16px;
+  color:var(--text-dim);
+  font-size:13px;
+  line-height:1.6;
+}
+footer{padding:18px 28px; text-align:center; color:var(--text-dim); font-size:11.5px;}
+
+.field{
+  background:var(--surface-2);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:11px 13px;
+  color:var(--text);
+  font-size:14px;
+  width:100%;
+  outline:none;
+}
+.field:focus{border-color:var(--accent);}
+.btn-primary{
+  background:var(--accent);
+  color:#06211D;
+  border:none;
+  border-radius:10px;
+  padding:11px 16px;
+  font-size:14px;
+  font-weight:600;
+  cursor:pointer;
+}
+.btn-secondary{
+  background:transparent;
+  color:var(--accent);
+  border:1px solid var(--accent-dim);
+  border-radius:10px;
+  padding:9px 14px;
+  font-size:13.5px;
+  cursor:pointer;
+}
+.driver-row{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:10px 0;
+  border-bottom:1px solid var(--border);
+}
+.driver-row:last-child{border-bottom:none;}
+.driver-row .dot{width:8px; height:8px; border-radius:50%; background:var(--text-dim);}
+.driver-row .dot.linked{background:var(--accent);}
+.driver-name{flex:1; font-size:14px;}
+.driver-meta{font-size:12px; color:var(--text-dim);}
+.empty-note{color:var(--text-dim); font-size:13px; padding:8px 0;}
+
+#mapContainer{
+  width:100%;
+  height:420px;
+  border-radius:10px;
+  overflow:hidden;
+  border:1px solid var(--border);
+}
+.driver-marker{
+  width:20px; height:20px;
+  border-radius:50%;
+  background:var(--accent);
+  border:3px solid #06211D;
+  box-shadow:0 0 0 5px var(--accent-dim);
+}
+.driver-marker.stale{
+  background:var(--text-dim);
+  box-shadow:none;
+  border-color:var(--surface);
+}
+.mapboxgl-popup-content{
+  background:var(--surface) !important;
+  color:var(--text) !important;
+  font-family:inherit !important;
+  border-radius:8px !important;
+  font-size:12.5px !important;
+}
+.mapboxgl-popup-tip{border-top-color:var(--surface) !important; border-bottom-color:var(--surface) !important;}
+
+.titik-row{
+  position:relative;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  background:var(--surface-2);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:8px 10px;
+}
+.titik-order{
+  width:22px; height:22px;
+  border-radius:50%;
+  background:var(--accent-dim);
+  color:var(--accent);
+  font-size:11.5px;
+  font-weight:600;
+  display:flex; align-items:center; justify-content:center;
+  flex-shrink:0;
+}
+.titik-row input{
+  flex:1;
+  background:transparent;
+  border:none;
+  color:var(--text);
+  font-size:13.5px;
+  outline:none;
+}
+.titik-btn{
+  background:transparent;
+  border:none;
+  color:var(--text-dim);
+  cursor:pointer;
+  font-size:15px;
+  padding:2px 5px;
+}
+.titik-btn:hover{color:var(--text);}
+.titik-btn.danger:hover{color:var(--danger);}
+.autocomplete-list{
+  position:absolute;
+  top:calc(100% + 4px);
+  left:0; right:0;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:10px;
+  overflow:hidden;
+  z-index:20;
+  max-height:220px;
+  overflow-y:auto;
+}
+.autocomplete-item{
+  padding:10px 12px;
+  font-size:13px;
+  cursor:pointer;
+  border-bottom:1px solid var(--border);
+}
+.autocomplete-item:last-child{border-bottom:none;}
+.autocomplete-item:hover{background:var(--surface-2);}
+.btn-delete{
+  background:transparent;
+  border:1px solid var(--border);
+  color:var(--danger);
+  border-radius:8px;
+  padding:5px 10px;
+  font-size:12px;
+  cursor:pointer;
+}
+.btn-delete:hover{border-color:var(--danger);}
+
+/* --- Riwayat & Arsip Trip (Tahap 8) --- */
+.riwayat-row{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:10px 0;
+  border-bottom:1px solid var(--border);
+  cursor:pointer;
+}
+.riwayat-row:last-child{border-bottom:none;}
+.riwayat-row:hover{background:var(--surface-2);}
+
+#riwayatModal{
+  position:fixed; inset:0;
+  background:rgba(0,0,0,0.6);
+  z-index:60;
+  display:flex;
+  align-items:flex-end;
+  justify-content:center;
+}
+#riwayatSheet{
+  background:var(--surface);
+  width:100%;
+  max-width:560px;
+  max-height:88vh;
+  overflow-y:auto;
+  border-radius:18px 18px 0 0;
+  padding:20px 18px 24px;
+}
+.sheet-title{font-size:15px; font-weight:600; margin-bottom:14px;}
+
+.riwayat-cp-item{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:10px 0;
+  border-bottom:1px solid var(--border);
+}
+.riwayat-cp-item:last-child{border-bottom:none;}
+.riwayat-thumb{
+  width:48px; height:48px;
+  object-fit:cover;
+  border-radius:8px;
+  flex-shrink:0;
+}
+
+/* --- Modal pilih lokasi manual di peta --- */
+#pickLocationModal{
+  position:fixed; inset:0;
+  background:rgba(0,0,0,0.6);
+  z-index:60;
+  display:flex;
+  align-items:flex-end;
+  justify-content:center;
+}
+#pickLocationSheet{
+  background:var(--surface);
+  width:100%;
+  max-width:560px;
+  max-height:92vh;
+  overflow-y:auto;
+  border-radius:18px 18px 0 0;
+  padding:20px 18px 24px;
+}
+#pickLocationMap{
+  width:100%;
+  height:320px;
+  border-radius:10px;
+  overflow:hidden;
+  border:1px solid var(--border);
+  margin-top:4px;
+}

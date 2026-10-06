@@ -1,0 +1,193 @@
+/* ==========================================================================
+   driver.css — khusus driver.html. Memuat css/base.css dulu sebelum ini.
+   ========================================================================== */
+
+body{
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+header{
+  padding:18px 20px 14px;
+  border-bottom:1px solid var(--border);
+  background:var(--surface);
+}
+.brand{
+  font-size:15px;
+  font-weight:600;
+  letter-spacing:0.2px;
+}
+.brand span{color:var(--accent);}
+.sub{
+  margin-top:4px;
+  font-size:12.5px;
+  color:var(--text-dim);
+}
+main{padding:16px; display:flex; flex-direction:column; gap:14px;}
+.card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:16px;
+}
+.card h2{
+  font-size:13px;
+  font-weight:600;
+  color:var(--text-dim);
+  margin-bottom:10px;
+  text-transform:none;
+}
+.placeholder{
+  text-align:center;
+  padding:28px 16px;
+  color:var(--text-dim);
+  font-size:13px;
+  line-height:1.6;
+}
+footer{
+  padding:14px 20px 20px;
+  text-align:center;
+  color:var(--text-dim);
+  font-size:11.5px;
+}
+
+.logout-link{
+  font-size:12px;
+  color:var(--text-dim);
+  text-decoration:underline;
+  cursor:pointer;
+}
+.btn-primary{
+  background:var(--accent);
+  color:#06211D;
+  border:none;
+  border-radius:10px;
+  padding:13px 16px;
+  font-size:14.5px;
+  font-weight:600;
+  cursor:pointer;
+}
+.btn-secondary{
+  background:transparent;
+  color:var(--accent);
+  border:1px solid var(--accent-dim);
+  border-radius:10px;
+  padding:12px 14px;
+  font-size:14px;
+  cursor:pointer;
+}
+
+/* --- List titik rute --- */
+.titik-item{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:11px 0;
+  border-bottom:1px solid var(--border);
+}
+.titik-item:last-child{border-bottom:none;}
+.titik-badge{
+  width:24px; height:24px;
+  border-radius:50%;
+  background:var(--surface-2);
+  color:var(--text-dim);
+  font-size:11.5px;
+  font-weight:600;
+  display:flex; align-items:center; justify-content:center;
+  flex-shrink:0;
+}
+.titik-badge.done{background:var(--accent-dim); color:var(--accent);}
+.titik-info{flex:1; min-width:0;}
+.titik-nama{font-size:13.5px;}
+.titik-status{font-size:11.5px; color:var(--text-dim); margin-top:2px;}
+.titik-status.berhasil{color:var(--accent);}
+.titik-status.gagal{color:var(--danger);}
+.titik-status.ditunda{color:var(--warn);}
+.btn-isi{
+  background:var(--accent);
+  color:#06211D;
+  border:none;
+  border-radius:8px;
+  padding:8px 12px;
+  font-size:12.5px;
+  font-weight:600;
+  cursor:pointer;
+  flex-shrink:0;
+}
+
+/* --- Modal checkpoint --- */
+#checkpointModal{
+  position:fixed; inset:0;
+  background:rgba(0,0,0,0.6);
+  z-index:60;
+  display:flex;
+  align-items:flex-end;
+  justify-content:center;
+}
+#checkpointSheet{
+  background:var(--surface);
+  width:100%;
+  max-width:480px;
+  max-height:88vh;
+  overflow-y:auto;
+  border-radius:18px 18px 0 0;
+  padding:20px 18px 24px;
+}
+.sheet-title{font-size:15px; font-weight:600; margin-bottom:14px;}
+.field-label{
+  display:block;
+  font-size:12px;
+  color:var(--text-dim);
+  margin:12px 0 5px;
+}
+.field{
+  background:var(--surface-2);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:10px 12px;
+  color:var(--text);
+  font-size:13.5px;
+  width:100%;
+  outline:none;
+  font-family:inherit;
+}
+.field:focus{border-color:var(--accent);}
+select.field{appearance:none;}
+#cpFotoPreview, #fFotoPreview{
+  width:100%;
+  max-height:180px;
+  object-fit:cover;
+  border-radius:10px;
+  margin-top:8px;
+}
+
+/* --- Modal transaksi keuangan (sama pola dengan modal checkpoint) --- */
+#financeModal{
+  position:fixed; inset:0;
+  background:rgba(0,0,0,0.6);
+  z-index:60;
+  display:flex;
+  align-items:flex-end;
+  justify-content:center;
+}
+#financeSheet{
+  background:var(--surface);
+  width:100%;
+  max-width:480px;
+  max-height:88vh;
+  overflow-y:auto;
+  border-radius:18px 18px 0 0;
+  padding:20px 18px 24px;
+}
+
+/* --- List transaksi keuangan --- */
+.finance-item{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:10px 0;
+  border-bottom:1px solid var(--border);
+}
+.finance-item:last-child{border-bottom:none;}
+.finance-kategori{font-size:13.5px; flex:1;}
+.finance-nominal{font-size:13.5px; color:var(--accent); font-weight:600;}
+.finance-time{font-size:11px; color:var(--text-dim); margin-left:8px;}
