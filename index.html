@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recharge Tracking</title>
+<link rel="stylesheet" href="css/base.css">
+<style>
+  body{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    min-height:100%;
+    padding:24px;
+    gap:28px;
+    text-align:center;
+  }
+  .logo{font-size:19px; font-weight:600;}
+  .logo span{color:var(--accent);}
+  .pilihan{
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+    width:100%;
+    max-width:280px;
+  }
+  .pilihan a{
+    display:block;
+    text-decoration:none;
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:18px;
+    color:var(--text);
+  }
+  .pilihan a strong{display:block; font-size:15px; margin-bottom:4px;}
+  .pilihan a span{font-size:12.5px; color:var(--text-dim);}
+  .pilihan a:active{border-color:var(--accent);}
+</style>
+</head>
+<body>
+  <div class="logo">Recharge <span>Tracking</span></div>
+  <div class="pilihan">
+    <a href="driver.html">
+      <strong>Driver</strong>
+      <span>Checkin, tracking, checkpoint &amp; keuangan</span>
+    </a>
+    <a href="admin.html">
+      <strong>Admin</strong>
+      <span>Peta, rute, kelola driver &amp; riwayat trip</span>
+    </a>
+  </div>
+</body>
+</html>

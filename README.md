@@ -11,6 +11,7 @@ Dua halaman terpisah:
 
 ```
 .
+├── index.html           # Landing page — 2 tombol pintasan ke Driver / Admin
 ├── driver.html          # Halaman driver
 ├── admin.html           # Halaman admin
 ├── css/
@@ -60,7 +61,7 @@ Setiap halaman memuat file dalam urutan ini:
 4. **Deploy Security Rules** — buka Firebase Console → Firestore Database → tab **Rules** → tempel seluruh isi `firestore.rules` → **Publish**. (Atau via Firebase CLI: `firebase deploy --only firestore:rules`.)
 5. **Set PIN admin SEGERA setelah rules di-publish** — buka `admin.html`, masukkan PIN pilihanmu (4-6 digit) di layar login. **PIN yang kamu masukkan pertama kali itulah yang otomatis jadi PIN admin permanen** (mekanisme bootstrap tanpa backend). Jangan tunda, dan jangan bagikan link `admin.html` ke siapa pun sebelum langkah ini selesai — siapa pun yang berhasil submit PIN duluan di admin.html setelah rules aktif akan jadi admin.
 6. Buka `admin.html` untuk menambahkan akun driver (nama + PIN 4-6 digit, beda dari PIN admin), lalu driver login lewat `driver.html` di HP masing-masing.
-7. Deploy ke hosting statis apa saja (GitHub Pages, Netlify, Vercel, Firebase Hosting, dll) — tidak butuh server/backend.
+7. Deploy ke hosting statis apa saja (GitHub Pages, Netlify, Vercel, Firebase Hosting, dll) — tidak butuh server/backend. Setelah deploy, domain root (`/`) otomatis menampilkan `index.html` dengan 2 tombol pintasan ke Driver dan Admin — tidak perlu hafal `/driver.html` atau `/admin.html`.
 
 > **Catatan keamanan**: `js/config.js` berisi kredensial yang memang aman untuk terekspos di frontend (API key Firebase, cloud name Cloudinary, token Mapbox) karena akses sesungguhnya dibatasi lewat Firestore Security Rules, Cloudinary unsigned-preset, dan scope token Mapbox. **Jangan pernah** menambahkan Cloudinary API Secret ke file ini atau file manapun di repo.
 >
