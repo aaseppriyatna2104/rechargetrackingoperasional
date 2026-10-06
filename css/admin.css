@@ -262,3 +262,44 @@ footer{padding:18px 28px; text-align:center; color:var(--text-dim); font-size:11
   border:1px solid var(--border);
   margin-top:4px;
 }
+
+/* === Tab, rekap, notifikasi === */
+.tabs{display:flex; gap:8px; padding:10px 16px 0; align-items:center;}
+.tab{background:var(--surface); border:1px solid var(--border); color:var(--text-dim); border-radius:var(--radius); padding:8px 16px; font-size:13.5px; cursor:pointer;}
+.tab.active{color:var(--text); border-color:var(--accent);}
+.tab-notif{margin-left:auto; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:7px 12px; cursor:pointer; font-size:15px;}
+.rk-row{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px;}
+.rk-row .field{flex:1; min-width:130px;}
+.rk-tiles{display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px; margin:12px 0;}
+.rk-tile{background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); padding:12px;}
+.rk-tile b{display:block; font-size:17px;}
+.rk-tile span{font-size:12px; color:var(--text-dim);}
+.tbl-wrap{overflow-x:auto;}
+.rk-table{width:100%; border-collapse:collapse; font-size:12.5px; white-space:nowrap;}
+.rk-table th,.rk-table td{padding:7px 9px; text-align:left; border-bottom:1px solid var(--border);}
+.rk-table th{color:var(--text-dim); font-weight:500;}
+.rk-table tr.rk-total td{font-weight:600; border-top:1px solid var(--accent);}
+#toastBox{position:fixed; top:10px; left:50%; transform:translateX(-50%); z-index:9999; display:flex; flex-direction:column; gap:8px; width:min(92vw,420px);}
+.toast{background:var(--surface); border:1px solid var(--border); border-left:4px solid var(--accent); border-radius:var(--radius); padding:11px 13px; font-size:13px; box-shadow:0 6px 20px rgba(0,0,0,.4); cursor:pointer;}
+.toast.warn{border-left-color:var(--warn);}
+
+/* === Rute live di peta === */
+.rt-pin{width:24px; height:24px; border-radius:50%; border:3px solid; color:#0B0F14; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; box-sizing:border-box; cursor:pointer;}
+.rt-pin.rt-base{border-radius:6px; border-color:#0B0F14;}
+.lr-head{font-size:12px; color:var(--text-dim); margin:12px 0 6px;}
+.lr-row{display:flex; gap:10px; align-items:flex-start; padding:9px 0; border-top:1px solid var(--border); cursor:pointer;}
+.lr-dot{width:10px; height:10px; border-radius:50%; margin-top:5px; flex-shrink:0;}
+.lr-sub{font-size:12px; color:var(--text-dim); margin-top:2px;}
+
+/* === Replay jalur === */
+.rp-map{height:260px; border-radius:var(--radius); overflow:hidden; border:1px solid var(--border);}
+.rp-ctl{display:flex; gap:8px; align-items:center; margin:8px 0 4px;}
+.rp-seek{flex:1; min-width:0;}
+.rp-time{font-size:12.5px; min-width:42px; text-align:center;}
+.rp-speed{width:78px; flex:none;}
+.rp-dot{width:16px; height:16px; border-radius:50%; background:#2DD4BF; border:3px solid #fff; box-shadow:0 0 0 4px rgba(45,212,191,.35);}
+
+/* === Kartu Ringkasan === */
+.rg-line{font-size:12.5px; color:var(--text-dim); margin-top:6px;}
+.rg-warn{font-size:12.5px; color:var(--warn); margin-top:10px; line-height:1.5;}
+.rg-ok{font-size:12.5px; color:var(--accent); margin-top:10px;}
